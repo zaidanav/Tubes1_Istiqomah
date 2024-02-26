@@ -34,6 +34,7 @@ class RandomLogic(BaseLogic):
         
         if self.goal_position and self.goal_position.x == board_bot.position.x and self.goal_position.y == board_bot.position.y:
             self.goal_position = None
+        
         if self.goal_position == None:    
             check = self.checkSekitar(board_bot, board)
             if props.diamonds == 5:
