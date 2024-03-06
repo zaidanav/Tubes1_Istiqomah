@@ -9,13 +9,14 @@ from game.logic.random import RandomLogic
 from game.util import *
 from game.logic.base import BaseLogic
 from game.logic.logicTeleport import Teleport
-from game.logic.rombak import Rombak
+from game.logic.pulang import PulangLogic
 from game.logic.teleportXpulang import TelePulang
+from game.logic.fantom import Fantom
 init()
 BASE_URL = "http://localhost:3000/api"
 DEFAULT_BOARD_ID = 1
 CONTROLLERS = {
-    "Random": RandomLogic, "Teleport": Teleport, "Rombak": Rombak , "TelePulang": TelePulang
+    "Random": RandomLogic,"Pulang": PulangLogic , "TelePulang": TelePulang, "Fantom": Fantom
 }
 
 ###############################################################################
