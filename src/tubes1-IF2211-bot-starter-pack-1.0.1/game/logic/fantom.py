@@ -15,6 +15,7 @@ class Fantom(BaseLogic):
         self.isTeleport = False # status teleport , bot masuk atau tidak
         self.current_direction = 0  # arah pergerakan bot sekarang
         self.idTeleport = -1 # id teleport
+        self.isDiamond = 0 # status diamond yang telah diambil
         self.previous_goal: Optional[Position] = None # posisi tujuan sebelumnya
         
     # Fungsi untuk menghitung jarak antara dua titik
@@ -28,18 +29,13 @@ class Fantom(BaseLogic):
     # Fungsi untuk menghitung jumlah diamond di sekitar suatu titik
     def count(self,board: Board, center,rad):
         count = 0
-        range_xfirst = center.x - 6
-        range_yfirst = center.y - 6
-        range_xlast = center.x + 6
-        range_ylast = center.y + 6
-        
-        for i in range(range_xfirst, range_xlast+1):
-            for j in range(range_yfirst, range_ylast+1):
-                if i < 0 or i >= board.width or j < 0 or j >= board.height:
-                    continue
-                for game_object in board.game_objects:
-                    if game_object.position.x == i and game_object.position.y == j and game_object.type == "DiamondGameObject":
-                        count += 1
+        for game_object in board.game_objects:
+            # mendeteksi diamond di sekitar suatu titik
+            if game_object.type == "DiamondGameObject":
+                if self.countSteps(game_object.position, center) <= rad:
+                    count += 1
+                    if count >= 4:
+                        break
         return count
     
     # Fungsi untuk mencari diamond terdekat
@@ -80,15 +76,16 @@ class Fantom(BaseLogic):
         y = -1  # inisialisasi koordinat y diamond atau teleport terdekat
         for objek in board.game_objects: # iterasi semua objek di board
             if objek.type == "DiamondGameObject" or objek.type == "TeleportGameObject": # jika objek adalah diamond atau teleport 
+                cek = False
                 if objek.type == "TeleportGameObject": # jika objek adalah teleport
                     for tele in board.game_objects: # iterasi semua objek di board
                         if tele.type == "TeleportGameObject" and tele.id != objek.id: # jika objek adalah teleport dan id teleport tidak sama dengan id teleport sekarang 
                             if self.count(board, tele.position, 6) < 3: # jika jumlah diamond di sekitar teleport kurang dari 4 maka akan di skip
-                                print("count: ", self.count(board, tele.position, 6))
                                 continue
-            
-                cek = False
-                if objek.type == "DiamondGameObject": # jika objek adalah diamond
+                            else: 
+                                self.teleportid = tele.id
+                
+                elif objek.type == "DiamondGameObject": # jika objek adalah diamond
                     for k in range(len(board.diamonds)): # iterasi semua diamond di board
                         if board.diamonds[k].position.x == objek.position.x and board.diamonds[k].position.y == objek.position.y and board.diamonds[k].properties.points + props.diamonds > 5:
                             cek = True # jumlah diamond bot = 4 dan terdekat ternyata diamond merah yang 2 poin maka akan di skip
@@ -147,11 +144,13 @@ class Fantom(BaseLogic):
                 self.isTeleport = False
                 self.teleport = None
                 self.idTeleport = -1
+                self.goal_position = None
             elif self.isTeleportReset(board, self.teleport, self.idTeleport):
                 # jika teleport sudah di reset maka status teleport di reset
                 self.isTeleport = False
                 self.teleport = None
                 self.idTeleport = -1
+                self.goal_position = None
             # mengembalikan langkah yang diperlukan untuk menuju teleport
             return delta_x, delta_y
         
@@ -196,43 +195,40 @@ class Fantom(BaseLogic):
             self.goal_position = Position(base_y, base_x)
 
         if self.goal_position == None:
-            # jika tujuan bot belum di set
-            if self.previous_goal != None:
-                # jika tujuan sebelumnya sudah di set
-                if self.isObjectTeleport(board, self.previous_goal.x, self.previous_goal.y):
-                    # jika tujuan sebelumnya adalah teleport
-                    check = self.Diamond(board_bot, board)
-                else:
-                    # jika tujuan sebelumnya bukan teleport
-                    check = self.NewCheckSekitar(board_bot, board)
-            else:
-                # jika tujuan sebelumnya belum di set
-                check = self.NewCheckSekitar(board_bot, board)
-            
             if props.diamonds == 5:
                 # jika jumlah diamond bot = 5
                 # maka bot diarahkan menuju base
                 self.goal_position = Position(base_y, base_x)
-                self.previous_goal = Position(base_y, base_x)
 
-            elif props.diamonds >= 3:
-                # jika jumlah diamond bot lebih dari 3
-                if self.countSteps(current_position, Position(check[0], check[1])) <= self.countSteps(current_position, board_bot.properties.base):
-                    # jika jarak antara bot dengan diamond terdekat lebih kecil dari jarak antara bot dengan base
+            else:
+                if self.isDiamond == 2:
+                    check = self.NewCheckSekitar(board_bot, board) # mencari diamond atau teleport terdekat
+                    if self.isObjectTeleport(board, check[1], check[0]): # jika objek terdekat adalah teleport
+                        self.isDiamond = False 
+                        self.isTeleport = True
+                        self.teleport = Position(check[0], check[1]) # tujuan bot di set menjadi teleport terdekat
+                        self.isDiamond = 0 # status diamond di reset
+                else:
+                    check = self.Diamond(board_bot, board)
+                    self.isDiamond += 1 # bot telah mengambil 1 diamond 
+
+                if props.diamonds >= 3:
+                    # jika jumlah diamond bot lebih dari 3
+                    if self.countSteps(current_position, Position(check[0], check[1])) <= self.countSteps(current_position, board_bot.properties.base):
+                        # jika jarak antara bot dengan diamond terdekat lebih kecil dari jarak antara bot dengan base
+                        self.goal_position = Position(check[0], check[1])
+                        return get_direction(current_position.x,current_position.y,self.goal_position.x,self.goal_position.y)
+                    else:  
+                        # jika jarak antara bot dengan diamond terdekat lebih besar dari jarak antara bot dengan base
+                        self.goal_position = Position(base_y, base_x)
+                        self.previous_goal = Position(base_y, base_x)
+                        return get_direction(current_position.x,current_position.y,self.goal_position.x,self.goal_position.y)
+                elif check[0] != -1:
+                    # jika diamond terdekat ditemukan
                     self.goal_position = Position(check[0], check[1])
                     self.previous_goal = Position(check[0], check[1])
                     return get_direction(current_position.x,current_position.y,self.goal_position.x,self.goal_position.y)
-                else:  
-                    # jika jarak antara bot dengan diamond terdekat lebih besar dari jarak antara bot dengan base
-                    self.goal_position = Position(base_y, base_x)
-                    self.previous_goal = Position(base_y, base_x)
-                    return get_direction(current_position.x,current_position.y,self.goal_position.x,self.goal_position.y)
-            elif check[0] != -1:
-                # jika diamond terdekat ditemukan
-                self.goal_position = Position(check[0], check[1])
-                self.previous_goal = Position(check[0], check[1])
-                return get_direction(current_position.x,current_position.y,self.goal_position.x,self.goal_position.y)
-        
+            
         if self.goal_position.x == -1 and self.goal_position.y == -1:
             # jika tujuan bot tidak ditemukan
             # maka bot diarahkan menuju red button
