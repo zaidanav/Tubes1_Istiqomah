@@ -201,6 +201,7 @@ class Fantom(BaseLogic):
                 self.goal_position = Position(base_y, base_x)
 
             else:
+                # mencari objek selain diamond jika telah mengambil diamond lebih dari 2
                 if self.isDiamond == 2:
                     check = self.NewCheckSekitar(board_bot, board) # mencari diamond atau teleport terdekat
                     if self.isObjectTeleport(board, check[1], check[0]): # jika objek terdekat adalah teleport
